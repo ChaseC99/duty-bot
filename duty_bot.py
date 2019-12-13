@@ -14,10 +14,17 @@ slack_client = slack.WebClient(token=oauth_token)
 
 # Post Slack Message
 #   Posts a message to the channel set in global variables
-def post_slack_message(message: str):
+#   Sending it as an attachment with the color #1f4387,
+#       posts the message with the mesa blue line next to it
+def post_duty_slack_message(message: str):
     slack_client.chat_postMessage(
         channel = channel,
-        text = message
+        attachments = [
+		    {
+                "color": "#1f4387",
+                "text": "*" + message + "*"
+		    }
+        ]
     )
 
 # Main
@@ -40,4 +47,4 @@ if __name__ == "__main__":
     
     # Post duty team on slack
     for member in duty_members:
-        post_slack_message(member)
+        post_duty_slack_message(member)
