@@ -8,6 +8,7 @@ import time
 import schedule
 
 from config import SECRETS
+from config import MEMBER_IDS
 
 # Global Variables
 channel = "#bot-playground"
@@ -20,15 +21,31 @@ slack_client = slack.WebClient(token=oauth_token)
 #   Sending it as an attachment with the color #1f4387,
 #       posts the message with the mesa blue line next to it
 def post_duty_slack_message(message: str):
+    parsed_message = parse_for_users(message)
     slack_client.chat_postMessage(
         channel = channel,
         attachments = [
 		    {
                 "color": "#1f4387",
-                "text": "*" + message + "*"
+                "text": "*" + parsed_message + "*"
 		    }
         ]
     )
+
+# Parse For User
+#   Given a str, parse it and swap out any user names with user IDS
+#   This will @ the person when the message is posted
+def parse_for_users(text: str):
+    parsed_text = []
+    
+    for word in text.split(" "):
+        if word in MEMBER_IDS:
+            parsed_text.append(f"<@{MEMBER_IDS[word]}>")
+        else:
+            parsed_text.append(word)
+
+    return " ".join(parsed_text)  
+
 
 def post_daily_duty_schedule():
     # Generate Calendar Dictionary
