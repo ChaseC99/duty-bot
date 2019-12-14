@@ -3,13 +3,16 @@
 # Imports
 import slack
 from ical_dict import iCalDict
-from config import SECRETS
 from datetime import date
+import time
+import schedule
+
+from config import SECRETS
 
 # Global Variables
+channel = "#bot-playground"
 ical_url = SECRETS.get("ical_url")
 oauth_token = SECRETS.get("oauth_token")
-channel = "#bot-playground"
 slack_client = slack.WebClient(token=oauth_token)
 
 # Post Slack Message
@@ -27,8 +30,7 @@ def post_duty_slack_message(message: str):
         ]
     )
 
-# Main
-if __name__ == "__main__":
+def post_daily_duty_schedule():
     # Generate Calendar Dictionary
     #   {str : [dict]}
     #   key => date string (ex. "20191208")
@@ -48,3 +50,13 @@ if __name__ == "__main__":
     # Post duty team on slack
     for member in duty_members:
         post_duty_slack_message(member)
+
+
+# Main
+if __name__ == "__main__":
+    # Schedule jobs
+    schedule.every().day.at("16:00").do(post_daily_duty_schedule)
+
+    while True:
+        schedule.run_pending()
+        time.sleep(1)    
