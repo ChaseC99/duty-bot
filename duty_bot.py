@@ -38,13 +38,14 @@ def post_duty_slack_message(message: str):
 def parse_for_users(text: str):
     parsed_text = []
     
-    for word in text.split(" "):
+    for word in text.split(":"):
+        word = word.strip()
         if word in MEMBER_IDS:
             parsed_text.append(f"<@{MEMBER_IDS[word]}>")
         else:
             parsed_text.append(word)
 
-    return " ".join(parsed_text)  
+    return ": ".join(parsed_text)  
 
 
 def post_daily_duty_schedule():
@@ -71,9 +72,11 @@ def post_daily_duty_schedule():
 
 # Main
 if __name__ == "__main__":
+    
     # Schedule jobs
-    schedule.every().day.at("16:00").do(post_daily_duty_schedule)
+    schedule.every().day.at("16:00").do(post_daily_duty_schedule)    
 
     while True:
         schedule.run_pending()
         time.sleep(1)    
+    
