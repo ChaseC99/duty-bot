@@ -3,30 +3,9 @@
 ###
 #   Imports
 #
-import sys
-import os
 import urllib.request
-import json
+import re
 from collections import defaultdict
-
-# Default mapping for iCal
-default_mapping = {
-        "DTSTAMP":                              "dt_stamp",
-        "DTSTART;TZID=America/New_York":        "dt_start",
-        "DTEND;TZID=America/New_York":          "dt_end",
-        "SUMMARY":                              "summary",
-        "CATEGORIES":                           "categories",
-        "X-MICROSOFT-CDO-ALLDAYEVENT":          "all_day",
-        "LOCATION":                             "location",
-        "X-TRUMBA-LINK":                        "link_protocol",
-        "UID":                                  "uid",
-        "DESCRIPTION":                          "description",
-
-        "X-TRUMBA-CUSTOMFIELD;NAME=\"Organization\";ID=5323;TYPE=SingleLine":   "organization",
-        "X-TRUMBA-CUSTOMFIELD;NAME=\"Event Type\";ID=12;TYPE=number":           "event_type",
-        "X-TRUMBA-CUSTOMFIELD;NAME=\"Submitter Name\";ID=36;TYPE=SingleLine":   "submitter_name",
-        "X-TRUMBA-CUSTOMFIELD;NAME=\"Event Name\";ID=6143;TYPE=SingleLine":     "event_name"
-    }
 
 ###
 #   class iCalDict
@@ -38,131 +17,102 @@ class iCalDict():
     ###
     #   __init__
     #
-    #   Create a new iCalDict instance with a string representing a .ics file
-    #   (referenced by a string as a file path or URL) and an optional mapping
-    #   between .ics file keys and returned keys in the Dictionary.
+    #   Create a new iCalDict instance with a string representing a url to an .ics file
     #
-    def __init__(self, ics_file, mapping = default_mapping):
-        self.__ics_file = ics_file
-        self.__mapping = mapping
-        self.content = self.__file_get_contents()
-        self.data = self.__sanitize_data()
+    def __init__(self, ical_url: str):
+        self.__ical_url = ical_url
+        self.__data_dict = self.__load_data()
+
 
     ###
-    #   convert
+    #   refresh
     #
-    #   Convert the .ics file into a Dictionary.
+    #   Get the latest version of the ics_file
     #
-    def convert(self):
+    def refresh(self):
+        self.__data_dict = self.__file_get_contents()
 
-        # Confirm that all incoming data is valid, namely the file itself.
-        self.__validate()
 
-        if "BEGIN:VEVENT" not in self.data: raise Exception(self.__error_messages("no_events"))
+    ###
+    #   load data
+    #
+    #   load the calendar from the url and store it as a dict
+    #
+    def __load_data(self) -> dict:
+        # Fetch ical from url
+        #   content: str = the ical file, with every newline indicated by "\r\n"
+        content = urllib.request.urlopen(self.__ical_url).read().decode()
 
-        # Filter data by eliminating metadata and extraneous lines.
-        self.data = self.data[ self.data.index("BEGIN:VEVENT") : len(self.data) - self.data[::-1].index("END:VEVENT") ]
+        # Dict for the calendar
+        #   structure of ouput:
+        #   { date (str YYYYMMDD):
+        #       { unique_id (str): 
+        #           { event_dict }
+        #       }
+        #   }
+        output = defaultdict(dict)
+        
+        # Regex Expression to match events
+        #   This captures all of the content of the vevent as a str, 
+        #   with each vevent value on a newline (\r\n)
+        event_regex = r"BEGIN:VEVENT\r\n(.+?(?=END:VEVENT))"
+        event_matches = re.finditer(event_regex, content, re.MULTILINE | re.DOTALL)
+        
+        # Iterate over matches 
+        for event in event_matches:
+            # Split the vevent str by its lines,
+            # so that each line contains a value
+            #   ex: ['DTSTART;VALUE=DATE:20191221', 'DTEND;VALUE=DATE:20191222', 'UID:0aolsmdd0eufajj0', 'SUMMARY:D1:Chase'] 
+            event_list = event.group(1).split("\r\n")
+            
+            # Convert that list into a dict
+            #   ex: ['SUMMARY:D1:Chase', 'UID:0aolsmdd0eufajj0'] -> { 'SUMMARY': 'D1:Chase', 'UID': '0aolsmdd0eufajj0' }
+            event_dict = self.__list_to_dict(event_list)
+            
+            # Get the start date and unique id of the event
+            start_date = event_dict["DTSTART;VALUE=DATE"]
+            unique_id = event_dict["UID"]
 
-        output = defaultdict(list)
+            # Add the event to the output
+            output[start_date][unique_id] = event_dict
+            
 
-        # Continue to iterate over the events and convert each event block to a Dictionary.
-        # Filter this data out of data and continue. 
-        while len(self.data) > 0:
-            event_dict = self.__array_to_dict(self.data[ 0 : self.data.index("END:VEVENT") + 1 ])
-            output[event_dict["DTSTART;VALUE=DATE"]].append(event_dict)
-            self.data = [value for key, value in enumerate(self.data) if key > self.data.index("END:VEVENT")]
-
+        # Return the calendar dict object
         return output
 
-    ###
-    #   print
-    #
-    #   Print the calendar as a json
-    #
-    def print_cal(self):
-        print(json.dumps(self.convert()))
 
     ###
-    #   __map_keys
-    #
-    #   Given a key, check if the __mapping variable contains a mapping. Based on availability,
-    #   return valid key to be used in the output.
-    #
-    def __map_keys(self, key):
-        if key in self.__mapping:
-            return self.__mapping[key]
-        else:
-            return key
-
-    ###
-    #   __array_to_dict
+    #   __list_to_dict
     #
     #   Given a list of .ics lines, return the list as a Dictionary object.
     #
-    def __array_to_dict(self, data):
-
+    def __list_to_dict(self, data: list) -> dict:
+        
+        # Assert that data is of type list
         if not isinstance(data, list): raise Exception(self.__error_messages("array_required"))
 
-        output = {}
+        # Event dict
+        event_dict = {}
 
+        # Iterate over all ical values
         for line in data:
-
+            # Split line into key and value
+            #   ex: "SUMMARY:D1: Chase" -> ["SUMMARY", "D1: Chase"]
             elements = line.split(':', 1)
 
-            if not isinstance(elements, list) and len(elements) is not 2: raise Exception("%s: %s" % self.__error_messages("invalid_element"), line)
+            # Assert that elements has a key and a pair
+            #   If it doesn't, ignore the line
+            if len(elements) != 2: 
+                continue
 
-            if elements[0] in output:
-                # TODO: A key already exists in the output, this would overwrite. Handle.
-                pass
+            # Add the key/value pair to the event_dict
+            #   elements[0] is the key.     ex: "SUMMARY"
+            #   elements[1] is the value.   ex: "D1: Chase"
+            event_dict[elements[0]] = elements[1]
 
-            output[self.__map_keys(elements[0])] = elements[1]
+        return event_dict
 
-        return output
-
-    ###
-    #   __file_get_contents
-    #
-    #   Retrieve the contents of the .ics file as an array,
-    #   separated by line.
-    #
-    def __file_get_contents(self):
-        content = urllib.request.urlopen(self.__ics_file).read()
-
-        return [line for line in content.decode().split("\r\n")]
     
-
-    ###
-    #   __sanitize_data
-    #
-    #   Sanitize the class variable such that wrapped lines are
-    #   appended to the array elements they belong with.
-    #
-    def __sanitize_data(self):
-        
-        output = []
-
-        for line in self.content:
-
-            if len(line) == 0: continue
-
-            if line[0] == ' ':
-                output[len(output) - 1] += line.lstrip()
-            else:
-                output.append(line)
-
-        return output
-
-    ###
-    #   __validate
-    #
-    #   Validate the .ics file's data and raise exceptions where needed.
-    #
-    def __validate(self):
-
-        # If the file does not start with "BEGIN:VCALENDAR".
-        if "BEGIN:VCALENDAR" not in self.data[0]:
-            raise Exception(self.__error_messages("invalid_file"))
-
     ###
     #   __error_messages
     #
@@ -181,15 +131,18 @@ class iCalDict():
 
         return messages[key]
 
+    
+    ###
+    #   override str
+    #
+    #   return the dict as a str
+    def __str__(self) -> str:
+        return str(self.__data_dict)
+    
 ###
 #   Testing the above.
 #
 if __name__ == '__main__':
-    
-
-    converter = iCalDict("https://calendar.google.com/calendar/ical/uci.edu_r87coleati6kfm7asmi6tr260k%40group.calendar.google.com/private-33e581bacc175894eedeecba638be0f1/basic.ics", mapping)
-    print(json.dumps(converter.convert()))
-
-    # converter = iCalDict('http://25livepub.collegenet.com/calendars/NJIT_EVENTS.ics')
-    # converter = iCalDict(os.path.dirname(__file__) + '/../examples/events.ics', mapping)
-    # print json.dumps(converter.convert())
+    ical_url = "https://calendar.google.com/calendar/ical/uci.edu_5jklevjtcuktlt4ltl8mlfc3eo%40group.calendar.google.com/private-0b64929a1db93a0150220deec82a9e3a/basic.ics"
+    ical = iCalDict(ical_url)
+    print(ical)
