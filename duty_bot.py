@@ -2,7 +2,7 @@
 
 # Imports
 import slack
-from ical_dict import iCalDict
+from ical import iCal
 from datetime import date
 import time
 import schedule
@@ -53,15 +53,15 @@ def post_daily_duty_schedule():
     #   {str : [dict]}
     #   key => date string (ex. "20191208")
     #   value => list of dicts for each event
-    cal_dict = iCalDict(ical_url).convert()
+    cal = iCal(ical_url)
 
     # Get today's date
     today = date.today()
     today_str = f"{today.year}{today.month:02d}{today.day:02d}"
     
     # Find duty team for today
-    today_team = cal_dict[today_str]
-    duty_members = [duty_member["summary"] for duty_member in today_team]
+    today_team = cal.get_events(today_str)
+    duty_members = [duty_member["SUMMARY"] for duty_member in today_team]
     duty_members.sort()
     print(duty_members)
     
@@ -72,11 +72,9 @@ def post_daily_duty_schedule():
 
 # Main
 if __name__ == "__main__":
-    
     # Schedule jobs
     schedule.every().day.at("16:00").do(post_daily_duty_schedule)    
 
     while True:
         schedule.run_pending()
-        time.sleep(1)    
-    
+        time.sleep(30)    
