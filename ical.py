@@ -8,21 +8,39 @@ import re
 from collections import defaultdict
 
 ###
-#   class iCalDict
+#   class iCal
 #
 #   Convert a .ics file into a Dictionary object.
 #
-class iCalDict():
+class iCal():
 
     ###
     #   __init__
     #
-    #   Create a new iCalDict instance with a string representing a url to an .ics file
+    #   Create a new iCal instance with a string representing a url to an .ics file
     #
     def __init__(self, ical_url: str):
         self.__ical_url = ical_url
         self.__data_dict = self.__load_data()
 
+
+    ###
+    #   get events
+    #
+    #   Get events for a given day
+    #
+    #   params: day (str with the format "YYYYMMDD")
+    #   returns: list of event_dicts
+    #   
+    def get_events(self, day: str) -> [dict]:
+        # Assert that there are events on the given day
+        # If no events, return an empty list
+        if not day in self.__data_dict:
+            return []
+
+        # Get the events for the day
+        return self.__data_dict[day].values()
+        
 
     ###
     #   refresh
@@ -144,5 +162,5 @@ class iCalDict():
 #
 if __name__ == '__main__':
     ical_url = "https://calendar.google.com/calendar/ical/uci.edu_5jklevjtcuktlt4ltl8mlfc3eo%40group.calendar.google.com/private-0b64929a1db93a0150220deec82a9e3a/basic.ics"
-    ical = iCalDict(ical_url)
+    ical = iCal(ical_url)
     print(ical)
