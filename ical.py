@@ -63,10 +63,9 @@ class iCal():
     #   compare
     #
     #   Compares two calendars
-    #   returns a dict containing changes, additions, and deletions
+    #   Returns a list of dicts containing changes, additions, and deletions
+    #       [{ change_type: str, event: dict, previous: ?dict }]
     #
-    #   [(time_checked, ADDITION/REMOVAL, event_time, event_summary),
-    #    (time_checked, UPDATED, event_time, event_summary, prev_event_summary)]
     def compare(self, old_cal):
         # Assert that other is of type ical        
         if not type(old_cal) == iCal: raise TypeError("other must be of type `iCal`") 
@@ -86,7 +85,7 @@ class iCal():
         # Find additions
         for day in days_added:
             for event in self.get_events(day):
-                difference.append(("time", "ADDITION", day, event["SUMMARY"]))
+                difference.append({ "change_type": "ADDITION", "event": event })
         
         # Find changes
         for day in days_shared:
@@ -95,7 +94,7 @@ class iCal():
         # Find removals
         for day in days_removed:
             for event in old_cal.get_events(day):
-                difference.append(("time", "REMOVAL", day, event["SUMMARY"]))
+                difference.append({ "change_type": "REMOVAL", "event": event })
 
         return difference
 
@@ -103,7 +102,10 @@ class iCal():
     ###
     #   compare days
     #
-    #   Given two days, in the following dict format
+    #   Given two days, find all added, removed, and updated events
+    #   Return a list of dicts in the following format
+    #       [{ change_type: str, event: dict, previous: ?dict }]
+    #
     def __compare_days(self, time: str, day1: dict, day2: dict):
         difference = []    
 
@@ -119,19 +121,19 @@ class iCal():
 
         # Find additions
         for event_id in events_added:
-            difference.append(("time", "ADDITION", time, day1[event_id]["SUMMARY"]))
+            difference.append({ "change_type": "ADDITION", "event": day1[event_id] })
 
         # Find changes
         for event_id in events_shared:
-            new_summary = day1[event_id]["SUMMARY"]
-            old_summary = day2[event_id]["SUMMARY"]
+            current_event = day1[event_id]
+            previous_event = day2[event_id]
 
-            if new_summary != day2[event_id]["SUMMARY"]:
-                difference.append(("time", "UPDATED", time, new_summary, old_summary))
+            if current_event["SUMMARY"] != previous_event["SUMMARY"]:
+                difference.append({ "change_type": "UPDATE", "event": current_event,  "previous_event": previous_event })
 
         # Find removals
         for event_id in events_removed:
-            difference.append(("time", "REMOVAL", time, day2[event_id]["SUMMARY"]))
+            difference.append({ "change_type": "REMOVAL", "event": day2[event_id] })
 
         return difference
 
@@ -172,8 +174,18 @@ class iCal():
             #   ex: ['SUMMARY:D1:Chase', 'UID:0aolsmdd0eufajj0'] -> { 'SUMMARY': 'D1:Chase', 'UID': '0aolsmdd0eufajj0' }
             event_dict = self.__list_to_dict(event_list)
             
-            # Get the start date and unique id of the event
-            start_date = event_dict["DTSTART;VALUE=DATE"]
+            # Get the start date of the event
+            # If the key is not in the event dict,
+            #   then it is not an all day event.
+            #   Handle this cause by get the `DTSTART` and taking the substring to remove the time, leaving only the date.
+            #   Add this start date to the dict with key `DTSTART;VALUE=DATE`, so there won't be other errors later on.
+            if "DTSTART;VALUE=DATE" in event_dict:
+                start_date = event_dict["DTSTART;VALUE=DATE"]
+            else:
+                start_date = event_dict["DTSTART"][0:8]
+                event_dict["DTSTART;VALUE=DATE"] = start_date
+
+            # Get event's unique id
             unique_id = event_dict["UID"]
 
             # Add the event to the output
