@@ -46,9 +46,94 @@ class iCal():
     #   refresh
     #
     #   Get the latest version of the ics_file
+    #   If `compare` is set to true,
+    #       then it will return the difference between the old and new cals
     #
-    def refresh(self):
-        self.__data_dict = self.__file_get_contents()
+    def refresh(self, compare=False):
+        if compare:
+            temp = iCal(self.__ical_url)
+            difference = temp.compare(self)
+            self.__data_dict = temp.__data_dict
+            return difference
+        else:
+            self.__data_dict = self.__load_data()
+
+
+    ###
+    #   compare
+    #
+    #   Compares two calendars
+    #   returns a dict containing changes, additions, and deletions
+    #
+    #   [(time_checked, ADDITION/REMOVAL, event_time, event_summary),
+    #    (time_checked, UPDATED, event_time, event_summary, prev_event_summary)]
+    def compare(self, old_cal):
+        # Assert that other is of type ical        
+        if not type(old_cal) == iCal: raise TypeError("other must be of type `iCal`") 
+
+        difference = []
+
+        # Get the days for the current calendar and old calendar
+        new_days = self.__data_dict.keys()
+        old_days = old_cal.__data_dict.keys()
+
+        # Compare the dict_keys to get the days added, removed, and shared
+        # Set operations can be used on the dict_key class
+        days_added = new_days - old_days
+        days_removed = old_days - new_days
+        days_shared = new_days & old_days
+        
+        # Find additions
+        for day in days_added:
+            for event in self.get_events(day):
+                difference.append(("time", "ADDITION", day, event["SUMMARY"]))
+        
+        # Find changes
+        for day in days_shared:
+            difference += self.__compare_days(day, self[day], old_cal[day])
+
+        # Find removals
+        for day in days_removed:
+            for event in old_cal.get_events(day):
+                difference.append(("time", "REMOVAL", day, event["SUMMARY"]))
+
+        return difference
+
+
+    ###
+    #   compare days
+    #
+    #   Given two days, in the following dict format
+    def __compare_days(self, time: str, day1: dict, day2: dict):
+        difference = []    
+
+        # Get all event_ids from the new and old days        
+        new_events = day1.keys()
+        old_events = day2.keys()
+
+        # Compare the dict_keys to get the events added, removed, and shared
+        # Set operations can be used on the dict_key class
+        events_added = new_events - old_events
+        events_removed = old_events - new_events
+        events_shared = new_events & old_events
+
+        # Find additions
+        for event_id in events_added:
+            difference.append(("time", "ADDITION", time, day1[event_id]["SUMMARY"]))
+
+        # Find changes
+        for event_id in events_shared:
+            new_summary = day1[event_id]["SUMMARY"]
+            old_summary = day2[event_id]["SUMMARY"]
+
+            if new_summary != day2[event_id]["SUMMARY"]:
+                difference.append(("time", "UPDATED", time, new_summary, old_summary))
+
+        # Find removals
+        for event_id in events_removed:
+            difference.append(("time", "REMOVAL", time, day2[event_id]["SUMMARY"]))
+
+        return difference
 
 
     ###
@@ -149,7 +234,15 @@ class iCal():
 
         return messages[key]
 
-    
+
+    ###
+    #   override getitem
+    #
+    #   Add ability to use the [] operator
+    #   Returns the value for key in self.__data_dict
+    def __getitem__(self, key):
+        return self.__data_dict[key]
+
     ###
     #   override str
     #
