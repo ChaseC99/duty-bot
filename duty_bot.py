@@ -56,14 +56,17 @@ def parse_for_users(text: str) -> str:
 
 # Date to String
 #   Given a str in ical date format (YYYYMMDD),
-#   Return it in a readable format (MM/DD/YYYY)
-#   TODO: Use dict to swape out month number with month name,
-#           format should be (Month DD, YYYY)
+#   Return it in a readable format (Month DD, YYYY)
+months = {  '01':'January', '02':'February', '03':'March',
+            '04': 'April',  '05':'May',      '06':'June',
+            '07':'July',    '08':'August',   '09':'September', 
+            '10':'October', '11':'November', '12':'December' }
+
 def date_to_string(date: str) -> str:
     year = date[0:4]
     month = date[4:6]
     day = date[6:]
-    return f"{month}/{day}/{year}"
+    return f"{months[month]} {day}, {year}"
 
 
 # Post Daily Duty Schedule
