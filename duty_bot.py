@@ -11,8 +11,11 @@ from config import SECRETS
 from config import MEMBER_IDS
 
 # Global Variables
+testing_mode = True
 duty_channel = "#duty"
 trade_channel = "#duty-trade-tracker"
+if testing_mode: duty_channel = trade_channel = "#bot-playground"
+
 ical_url = SECRETS.get("ical_url")
 oauth_token = SECRETS.get("oauth_token")
 slack_client = slack.WebClient(token=oauth_token)
