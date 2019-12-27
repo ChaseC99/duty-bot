@@ -11,37 +11,18 @@ from config import SECRETS
 from config import MEMBER_IDS
 
 # Global Variables
-channel = "#bot-playground"
+duty_channel = "#duty"
+trade_channel = "#duty-trade-tracker"
 ical_url = SECRETS.get("ical_url")
 oauth_token = SECRETS.get("oauth_token")
 slack_client = slack.WebClient(token=oauth_token)
 
-# Post Slack Duty Message
+
+# Post Slack Message (attachment)
 #   Posts a message to the channel set in global variables
 #   Sending it as an attachment with the color #1f4387,
 #       posts the message with the mesa blue line next to it
-# TODO: rename to `post_attachment_slack_message`, 
-#       kick parse_for_users out to the func that called this one,
-#       combine with `post_calendar_slack_message`
-def post_duty_slack_message(message: str):
-    parsed_message = parse_for_users(message)
-    slack_client.chat_postMessage(
-        channel = channel,
-        attachments = [
-		    {
-                "color": "#1f4387",
-                "text": "*" + parsed_message + "*"
-		    }
-        ]
-    )
-
-
-# Post Calendar Slack Message
-# TODO: see above
-def post_calendar_slack_message(pretext: str, message: str):
-    print(pretext)
-    print(message)
-    
+def post_attachment_slack_message(channel: str, pretext: str, message: str):
     slack_client.chat_postMessage(
         channel = channel,
         attachments = [
@@ -52,7 +33,6 @@ def post_calendar_slack_message(pretext: str, message: str):
             }
         ]
     )
-
 
 
 # Parse For User
@@ -103,7 +83,9 @@ def post_daily_duty_schedule():
     
     # Post duty team on slack
     for member in duty_members:
-        post_duty_slack_message(member)
+        parsed_message = parse_for_users(member)
+        formatted_message = "*" + parsed_message + "*"
+        post_attachment_slack_message(duty_channel, None, formatted_message)
 
 
 # Check for Calendar Updates
@@ -129,7 +111,8 @@ def check_for_calendar_updates(calendar):
 
             # Post messages to slack, depending on the change_type
             if change_type == "ADDITION":
-                post_calendar_slack_message(
+                post_attachment_slack_message(
+                    trade_channel,
                     "Calendar event was added :rotating_light:",
                     "*{event_title}*\n{date}".format(
                         event_title = parse_for_users(event_summary),
@@ -137,16 +120,18 @@ def check_for_calendar_updates(calendar):
                     )
                 )
             elif change_type == "UPDATE":
-                post_calendar_slack_message(
+                post_attachment_slack_message(
+                    trade_channel,
                     "Calendar event was updated",
-                    "*~{old_event}~ → {new_event}*\n{date}".format(
+                    "*~{old_event}~*\n*{new_event}*\n{date}".format(
                         old_event = parse_for_users(difference["previous_event"]["SUMMARY"]),
                         new_event = parse_for_users(event_summary),
                         date = event_date
                     )
                 )
             elif change_type == "REMOVAL":
-                post_calendar_slack_message(
+                post_attachment_slack_message(
+                    trade_channel,
                     "Calendar event was deleted :rotating_light:",
                     "*~{event_title}~*\n{date}".format(
                         event_title = parse_for_users(event_summary),
