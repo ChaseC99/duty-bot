@@ -6,6 +6,7 @@ from ical import iCal
 from datetime import date
 import time
 import schedule
+import traceback
 
 from config import SECRETS
 from config import MEMBER_IDS
@@ -22,19 +23,39 @@ slack_client = slack.WebClient(token=oauth_token)
 
 
 # Post Slack Message (attachment)
-#   Posts a message to the channel set in global variables
 #   Sending it as an attachment with the color #1f4387,
 #       posts the message with the mesa blue line next to it
-def post_attachment_slack_message(channel: str, pretext: str, message: str):
+def post_attachment_slack_message(channel: str, pretext: str, message: str, color="1f4387"):
     slack_client.chat_postMessage(
         channel = channel,
         attachments = [
             {
-                "color": "#1f4387",
+                "color": color,
                 "pretext": pretext,
                 "text": message
             }
         ]
+    )
+
+
+# Post Slack Message
+#   Post a normal slack message to the specified channel
+def post_slack_message(channel: str, text: str):
+    slack_client.chat_postMessage(
+        channel = channel,
+        text = text
+    )
+
+
+# Post Exception Message
+#   Given an exception, it will post the exceptions information to Slack
+def post_exception():
+    post_slack_message("#bot-playground", "*Duty Bot has crashed!* :rotating_light: <!channel>")
+    post_attachment_slack_message(
+        "#bot-playground", 
+        "The following error was detected:",
+        traceback.format_exc(),
+        "ff0000"
     )
 
 
@@ -155,6 +176,12 @@ if __name__ == "__main__":
     schedule.every(5).minutes.do(check_for_calendar_updates, calendar)
     schedule.every().day.at("16:00").do(post_daily_duty_schedule)    
 
-    while True:
-        schedule.run_pending()
-        time.sleep(20)    
+    # Wrap main loop in a try statement
+    try:
+        while True:
+            schedule.run_pending()
+            time.sleep(20)    
+    except:
+        # Notify slack that an exception occured
+        if not TESTING_MODE: post_exception()
+        raise
