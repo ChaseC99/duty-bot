@@ -129,8 +129,14 @@ def check_for_calendar_updates(calendar):
     differences = calendar.refresh(compare=True)
     
     if not len(differences) == 0:
+        # Open file to log changes
+        log_file = open("log.txt", "a")
+
         for difference in differences:
-            # Pull some variables out of `difference
+            # Log the difference 
+            log_file.write(str(difference) + "\n")
+
+            # Pull some variables out of `difference`
             change_type = difference["change_type"]
             event = difference["event"]
             event_summary = event["SUMMARY"]
@@ -166,6 +172,9 @@ def check_for_calendar_updates(calendar):
                     )
                 )
 
+        # Close file
+        log_file.close()
+
 
 # Main
 if __name__ == "__main__":
@@ -189,6 +198,7 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         if not TESTING_MODE: 
             post_slack_message("#bot-playground", "Duty Bot has been deactivated :sleeping:")
+        raise
     except:
         # Notify slack that an exception occured
         if not TESTING_MODE: post_exception()
