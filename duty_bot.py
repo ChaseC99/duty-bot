@@ -178,9 +178,17 @@ if __name__ == "__main__":
 
     # Wrap main loop in a try statement
     try:
+        # Notify Slack that Duty Bot has been activated
+        if not TESTING_MODE:
+            post_slack_message("#bot-playground", "Duty Bot activated and reporting for duty :salute:")
+
         while True:
             schedule.run_pending()
             time.sleep(20)    
+
+    except KeyboardInterrupt:
+        if not TESTING_MODE: 
+            post_slack_message("#bot-playground", "Duty Bot has been deactivated :sleeping:")
     except:
         # Notify slack that an exception occured
         if not TESTING_MODE: post_exception()
