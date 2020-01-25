@@ -17,8 +17,11 @@ duty_channel = "#duty"
 trade_channel = "#duty-trade-tracker"
 if TESTING_MODE: duty_channel = trade_channel = "#bot-playground"
 
-ical_url = SECRETS.get("ical_url")
-oauth_token = SECRETS.get("oauth_token")
+# Secrets
+ical_url = SECRETS.get("ical_url")          # Duty Schedule from DUTY 1920
+oauth_token = SECRETS.get("oauth_token")    # Duty Bot OAuth Token for slack
+
+# Slack Client
 slack_client = slack.WebClient(token=oauth_token)
 
 
@@ -119,7 +122,6 @@ def post_daily_duty_schedule():
 #   Call refresh on calendar, 
 #   Check to see if there are differences between prev and current version,
 #   Post the differences to Slack,
-#   TODO: Log the differences (to a text file?)  
 #
 #   Note: Since python paramaters are `pass-by-object-reference`,
 #   calling refresh on calendar updates the variable in __main__.
