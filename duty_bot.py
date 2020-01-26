@@ -19,6 +19,7 @@ if TESTING_MODE: duty_channel = trade_channel = "#bot-playground"
 
 # Secrets
 ical_url = SECRETS.get("ical_url")          # Duty Schedule from DUTY 1920
+rlc_ical_url = SECRETS.get("rlc_ical_url")  # RLC Duty Schedule from URL DUTY 1920
 oauth_token = SECRETS.get("oauth_token")    # Duty Bot OAuth Token for slack
 
 # Slack Client
@@ -93,6 +94,31 @@ def date_to_string(date: str) -> str:
     return f"{months[month]} {day}, {year}"
 
 
+# Get Today
+#   Return today's date as a string that can be understood by iCal
+def get_today() -> str:
+    today = date.today()
+    today_str = f"{today.year}{today.month:02d}{today.day:02d}"
+    return today_str
+
+
+# Post Daily RLC Schedule
+def post_daily_rlc_schedule():
+    # Load RLC calendar
+    cal = iCal(rlc_ical_url)
+
+    # Get today's date
+    today_str = get_today()
+    
+    # Find rlcs on duty for today
+    rlcs = cal.get_event_summaries(today_str)
+
+    # Post rlcs on slack
+    if len(rlcs) > 0:
+        formatted_message = "*" +  ", ".join(rlcs) + "*"
+        post_attachment_slack_message(duty_channel, None, formatted_message, "87693b")
+
+
 # Post Daily Duty Schedule
 def post_daily_duty_schedule():
     # Generate Calendar Dictionary
@@ -102,20 +128,19 @@ def post_daily_duty_schedule():
     cal = iCal(ical_url)
 
     # Get today's date
-    today = date.today()
-    today_str = f"{today.year}{today.month:02d}{today.day:02d}"
+    today_str = get_today()
     
     # Find duty team for today
-    today_team = cal.get_events(today_str)
-    duty_members = [duty_member["SUMMARY"] for duty_member in today_team]
-    duty_members.sort()
-    print(duty_members)
-    
+    duty_members = cal.get_event_summaries(today_str)
+
     # Post duty team on slack
     for member in duty_members:
         parsed_message = parse_for_users(member)
         formatted_message = "*" + parsed_message + "*"
         post_attachment_slack_message(duty_channel, None, formatted_message)
+
+    # Post RLCs on duty
+    post_daily_rlc_schedule()
 
 
 # Check for Calendar Updates
@@ -182,7 +207,7 @@ def check_for_calendar_updates(calendar):
 if __name__ == "__main__":
     # Create calendar ref
     calendar = iCal(ical_url)
-
+    
     # Schedule jobs
     schedule.every(5).minutes.do(check_for_calendar_updates, calendar)
     schedule.every().day.at("16:00").do(post_daily_duty_schedule)    
