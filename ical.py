@@ -43,6 +43,25 @@ class iCal():
         
 
     ###
+    #   get event summaries
+    #
+    #   Get the summary for each event on a given day
+    #
+    #   params: day (str with the format "YYYYMMDD")
+    #   returns: list of event summaries (str0
+    #
+    def get_event_summaries(self, day: str) -> [str]:
+        # Get events for the day
+        events = self.get_events(day)
+
+        # Get summaries from each event
+        event_summaries = [event["SUMMARY"] for event in events]
+        event_summaries.sort()
+
+        return event_summaries
+
+
+    ###
     #   refresh
     #
     #   Get the latest version of the ics_file
