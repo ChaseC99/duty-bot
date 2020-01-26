@@ -115,7 +115,7 @@ def post_daily_rlc_schedule():
 
     # Post rlcs on slack
     if len(rlcs) > 0:
-        formatted_message = "*" +  ", ".join(rlcs) + "*"
+        formatted_message = "*" +  "* | *".join(rlcs) + "*"
         post_attachment_slack_message(duty_channel, None, formatted_message, "87693b")
 
 
