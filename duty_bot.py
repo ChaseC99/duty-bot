@@ -4,13 +4,12 @@
 import slack
 from ical import iCal
 from datetime import date
-import time
-import schedule
 import traceback
+import requests
 
 from config import SECRETS
-from config import MEMBER_IDS
 from config import TESTING_MODE
+from config import ROOMPACT
 
 # Global Variables
 duty_channel = "#duty"
@@ -63,22 +62,6 @@ def post_exception():
     )
 
 
-# Parse For User
-#   Given a str, parse it and swap out any user names with user IDS
-#   This will @ the person when the message is posted
-def parse_for_users(text: str) -> str:
-    parsed_text = []
-    
-    for word in text.split(":"):
-        word = word.strip()
-        if word in MEMBER_IDS:
-            parsed_text.append(f"<@{MEMBER_IDS[word]}>")
-        else:
-            parsed_text.append(word)
-
-    return ": ".join(parsed_text)  
-
-
 # Date to String
 #   Given a str in ical date format (YYYYMMDD),
 #   Return it in a readable format (Month DD, YYYY)
@@ -95,11 +78,61 @@ def date_to_string(date: str) -> str:
 
 
 # Get Today
-#   Return today's date as a string that can be understood by iCal
+#   Return today's date as a string `YYYY-MM-DD`
 def get_today() -> str:
     today = date.today()
-    today_str = f"{today.year}{today.month:02d}{today.day:02d}"
+    today_str = f"{today.year}-{today.month:02d}-{today.day:02d}"
     return today_str
+
+
+# Fetch the duty members from roompact
+#   Sends a request to the download schedule url for a specific day.
+#   Takes the emails of the people assigned to that day and fetches their user id from Slack
+#   Returns a list of user ids
+def fetch_duty_members_from_roompact():
+    # Roompact Config values
+    cookie = ROOMPACT.get("cookie")
+    region_id = ROOMPACT.get("region_id")
+    timezone = ROOMPACT.get("timezone")
+
+    # Get today's date
+    today_str = "2021-09-01" #get_today()
+
+    # Construct the request to Roompact
+    #   Should return a CSV of "First name", "Last name", "Email", etc.
+    url = f"https://roompact.com/schedule/download?start={today_str}&end={today_str}&region_id={region_id}&tz={timezone}"
+    r = requests.get(url, cookies=cookie)
+
+    if(r.status_code == 200):
+        decoded_content = r.content.decode("utf-8")
+        
+        # If the token is expired, the response will be a login page
+        if decoded_content.startswith("<!DOCTYPE"):
+            raise ValueError("Expired token")
+
+        # Convert the decoded content to rows
+        rows = decoded_content.split('\n')[:-1]
+        
+        # Pull out the header row
+        header = rows[0].split(",")
+        rows = rows[1:]
+
+        # Find the index of the email column
+        email_index = header.index("Email")
+        
+        # Construct a list slack ids for the duty members for that day
+        duty_members = []
+        for row in rows:
+            row_values = row.split(",")
+            email = row_values[email_index]
+
+            # Take the email of the member and find the related slack user id
+            response = slack_client.users_lookupByEmail(email=email)
+            duty_members.insert(0, response.data["user"]["id"])
+        
+        return duty_members
+    else:
+        raise Exception(f"Roompact request failed. Status Code: {r.status_code}. Error Message {r.text}")
 
 
 # Post Daily RLC Schedule
@@ -108,7 +141,8 @@ def post_daily_rlc_schedule():
     cal = iCal(rlc_ical_url)
 
     # Get today's date
-    today_str = get_today()
+    today_str = get_today().replace('-', '')
+    today_str = "20210901"
     
     # Find rlcs on duty for today
     rlcs = cal.get_event_summaries(today_str)
@@ -121,111 +155,23 @@ def post_daily_rlc_schedule():
 
 # Post Daily Duty Schedule
 def post_daily_duty_schedule():
-    # Generate Calendar Dictionary
-    #   {str : [dict]}
-    #   key => date string (ex. "20191208")
-    #   value => list of dicts for each event
-    cal = iCal(ical_url)
-
-    # Get today's date
-    today_str = get_today()
-    
     # Find duty team for today
-    duty_members = cal.get_event_summaries(today_str)
+    duty_members = fetch_duty_members_from_roompact()
 
     # Post duty team on slack
-    for member in duty_members:
-        parsed_message = parse_for_users(member)
-        formatted_message = "*" + parsed_message + "*"
+    for index, member in enumerate(duty_members):
+        duty_number = f"D{index}" if index != 0 else "DC" 
+        formatted_message = f"*{duty_number}: <@{member}>*"
         post_attachment_slack_message(duty_channel, None, formatted_message)
 
     # Post RLCs on duty
     post_daily_rlc_schedule()
 
 
-# Check for Calendar Updates
-#   Call refresh on calendar, 
-#   Check to see if there are differences between prev and current version,
-#   Post the differences to Slack,
-#
-#   Note: Since python paramaters are `pass-by-object-reference`,
-#   calling refresh on calendar updates the variable in __main__.
-def check_for_calendar_updates(calendar):
-    # Get a list of differences between the current and previous versions
-    # List format: [{ change_type: str, event: dict, previous: ?dict }]
-    differences = calendar.refresh(compare=True)
-    
-    if not len(differences) == 0:
-        # Open file to log changes
-        log_file = open("log.txt", "a")
-
-        for difference in differences:
-            # Log the difference 
-            log_file.write(str(difference) + "\n")
-
-            # Pull some variables out of `difference`
-            change_type = difference["change_type"]
-            event = difference["event"]
-            event_summary = event["SUMMARY"]
-            event_date = date_to_string(event["DTSTART;VALUE=DATE"])   
-
-            # Post messages to slack, depending on the change_type
-            if change_type == "ADDITION":
-                post_attachment_slack_message(
-                    trade_channel,
-                    "Calendar event was added :rotating_light:",
-                    "*{event_title}*\n{date}".format(
-                        event_title = parse_for_users(event_summary),
-                        date = event_date
-                    )
-                )
-            elif change_type == "UPDATE":
-                post_attachment_slack_message(
-                    trade_channel,
-                    "Calendar event was updated",
-                    "*~{old_event}~*\n*{new_event}*\n{date}".format(
-                        old_event = parse_for_users(difference["previous_event"]["SUMMARY"]),
-                        new_event = parse_for_users(event_summary),
-                        date = event_date
-                    )
-                )
-            elif change_type == "REMOVAL":
-                post_attachment_slack_message(
-                    trade_channel,
-                    "Calendar event was deleted :rotating_light:",
-                    "*~{event_title}~*\n{date}".format(
-                        event_title = parse_for_users(event_summary),
-                        date = event_date
-                    )
-                )
-
-        # Close file
-        log_file.close()
-
-
 # Main
 if __name__ == "__main__":
-    # Create calendar ref
-    calendar = iCal(ical_url)
-    
-    # Schedule jobs
-    schedule.every(5).minutes.do(check_for_calendar_updates, calendar)
-    schedule.every().day.at("16:00").do(post_daily_duty_schedule)    
-
-    # Wrap main loop in a try statement
     try:
-        # Notify Slack that Duty Bot has been activated
-        if not TESTING_MODE:
-            post_slack_message("#bot-playground", "Duty Bot activated and reporting for duty :salute:")
-
-        while True:
-            schedule.run_pending()
-            time.sleep(20)    
-
-    except KeyboardInterrupt:
-        if not TESTING_MODE: 
-            post_slack_message("#bot-playground", "Duty Bot has been deactivated :sleeping:")
-        raise
+        post_daily_duty_schedule()
     except:
         # Notify slack that an exception occured
         if not TESTING_MODE: post_exception()

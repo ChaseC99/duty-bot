@@ -201,7 +201,7 @@ class iCal():
             if "DTSTART;VALUE=DATE" in event_dict:
                 start_date = event_dict["DTSTART;VALUE=DATE"]
             else:
-                start_date = event_dict["DTSTART"][0:8]
+                start_date = event_dict["DTSTART;TZID=America/Los_Angeles"][0:8]
                 event_dict["DTSTART;VALUE=DATE"] = start_date
 
             # Get event's unique id
