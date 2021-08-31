@@ -168,6 +168,12 @@ def post_daily_duty_schedule():
     post_daily_rlc_schedule()
 
 
+# AWS Handler
+#   This is the entry point for the AWS lambda function
+def aws_handler(event, lambda_context):
+    post_daily_duty_schedule()
+
+
 # Main
 if __name__ == "__main__":
     try:
