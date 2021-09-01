@@ -96,7 +96,7 @@ def fetch_duty_members_from_roompact():
     timezone = ROOMPACT.get("timezone")
 
     # Get today's date
-    today_str = "2021-09-01" #get_today()
+    today_str = get_today()
 
     # Construct the request to Roompact
     #   Should return a CSV of "First name", "Last name", "Email", etc.
@@ -142,7 +142,6 @@ def post_daily_rlc_schedule():
 
     # Get today's date
     today_str = get_today().replace('-', '')
-    today_str = "20210901"
     
     # Find rlcs on duty for today
     rlcs = cal.get_event_summaries(today_str)
