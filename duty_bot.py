@@ -170,7 +170,12 @@ def post_daily_duty_schedule():
 # AWS Handler
 #   This is the entry point for the AWS lambda function
 def aws_handler(event, lambda_context):
-    post_daily_duty_schedule()
+    try:
+        post_daily_duty_schedule()
+    except:
+        # Notify slack that an exception occured
+        if not TESTING_MODE: post_exception()
+        raise
 
 
 # Main
