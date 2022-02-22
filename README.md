@@ -4,13 +4,13 @@ A bot to track Mesa Court's Duty Schedule.
 ### Features
 - Post the Mesa Court Duty Schedule everyday at 4pm on Slack
 <html>
-<img src="https://raw.githubusercontent.com/ChaseC99/duty-bot/master/assets/screenshots/duty-team.png" height=300px>
+<img src="assets/screenshots/duty-team.png" height=300px>
 </html>
 
 - Track changes to the Mesa Court Duty Schedule
 <html>
-<img src="https://github.com/ChaseC99/duty-bot/blob/master/assets/screenshots/event-updated.png?raw=true" height=200px>
-<img src="https://github.com/ChaseC99/duty-bot/blob/master/assets/screenshots/event-created-deleted.png?raw=true" height=200px>
+<img src="assets/screenshots/event-updated.png" height=200px>
+<img src="assets/screenshots/event-created-deleted.png" height=200px>
 </html>
 
 ### Dependencies
