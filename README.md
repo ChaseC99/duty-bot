@@ -25,3 +25,9 @@ To create a deployable zip file, run the following script in the project's root 
 Once the app is installed, you need to update the OAuth token in the `config.py` file.  
 To get the OAuth token, click on the "Add features and functionality" dropdown, then click the "Permissions" link.  
 Copy the `Bot User OAuth Token` and paste it `config.py`.
+
+### Customizing your Duty Bot
+1. Navigate to https://api.slack.com/apps
+2. Select "Duty Bot"
+3. Scroll down to "Display Information" at the bottom 
+4. Add the [Duty Bot Logo](assets/duty-bot.png) as the App Icon
