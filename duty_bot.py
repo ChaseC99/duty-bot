@@ -14,7 +14,8 @@ from config import ROOMPACT
 # Global Variables
 duty_channel = "#duty"
 trade_channel = "#duty-trade-tracker"
-if TESTING_MODE: duty_channel = trade_channel = "#bot-playground"
+log_channel = "#bot-log"
+if TESTING_MODE: duty_channel = trade_channel = log_channel
 
 # Secrets
 ical_url = SECRETS.get("ical_url")          # Duty Schedule from DUTY 1920
@@ -53,9 +54,9 @@ def post_slack_message(channel: str, text: str):
 # Post Exception Message
 #   Given an exception, it will post the exceptions information to Slack
 def post_exception():
-    post_slack_message("#bot-playground", "*Duty Bot has crashed!* :rotating_light: <!channel>")
+    post_slack_message(log_channel, "*Duty Bot has crashed!* :rotating_light: <!channel>")
     post_attachment_slack_message(
-        "#bot-playground", 
+        log_channel, 
         "The following error was detected:",
         traceback.format_exc(),
         "ff0000"
@@ -126,9 +127,15 @@ def fetch_duty_members_from_roompact():
             row_values = row.split(",")
             email = row_values[email_index]
 
-            # Take the email of the member and find the related slack user id
-            response = slack_client.users_lookupByEmail(email=email)
-            duty_members.insert(0, response.data["user"]["id"])
+            try:
+                # Take the email of the member and find the related slack user id
+                response = slack_client.users_lookupByEmail(email=email)
+                duty_members.insert(0, f"<@{response.data['user']['id']}>")
+            except:
+                # Print first and last name if the user can't be found
+                name = row_values[0] + " " + row_values[1]
+                name = name.replace('"', '')
+                duty_members.insert(0, name)
         
         return duty_members
     else:
@@ -160,7 +167,7 @@ def post_daily_duty_schedule():
     # Post duty team on slack
     for index, member in enumerate(duty_members):
         duty_number = f"D{index}" if index != 0 else "DC" 
-        formatted_message = f"*{duty_number}: <@{member}>*"
+        formatted_message = f"*{duty_number}: {member}*"
         post_attachment_slack_message(duty_channel, None, formatted_message)
 
     # Post RLCs on duty
