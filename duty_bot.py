@@ -171,7 +171,7 @@ def post_daily_duty_schedule():
         post_attachment_slack_message(duty_channel, None, formatted_message)
 
     # Post RLCs on duty
-    post_daily_rlc_schedule()
+    # post_daily_rlc_schedule()
 
 
 # AWS Handler
